@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Black Hole Simulation Guide - 3D</title>
+    <style>
+        body { margin: 0; background-color: #000; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; }
+        canvas { display: block; }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            max-width: 300px;
+            pointer-events: none;
+        }
+        h1 { font-size: 18px; margin-top: 0; color: #00d4ff; border-bottom: 1px solid #444; padding-bottom: 5px; }
+        .stat { font-family: monospace; font-size: 12px; margin-bottom: 5px; }
+        .label { color: #aaa; }
+        .value { color: #fff; font-weight: bold; }
+        .formula { font-style: italic; color: #ffcc00; font-size: 11px; }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <h1>BLACK HOLE SIMULATION</h1>
+        <div class="stat"><span class="label">Schwarzschild Radius (Rs):</span> <span class="value">2.0</span></div>
+        <div class="formula">Rs = (2 * G * M) / c²</div>
+        <hr/>
+        <div class="stat"><span class="label">Gravity:</span> <span class="value" id="g-val">a = GM / r²</span></div>
+        <div class="stat"><span class="label">Photon Sphere:</span> <span class="value">~1.5 Rs</span></div>
+        <div class="stat"><span class="label">Lensing (α):</span> <span class="value">4GM / (c²r)</span></div>
+        <div class="stat"><span class="label">Accretion Velocity:</span> <span class="value">v = √(GM/r)</span></div>
+        <hr/>
+        <div class="stat"><span class="label">Particles:</span> <span id="p-count" class="value">0</span></div>
+    </div>
+
+    <!-- Import Three.js via CDN -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- Konstanta & Konfigurasi ---
+        const G = 1;
+        const M = 100;
+        const c = 30;
+        const Rs = (2 * G * M) / Math.pow(c, 2); // Schwarzschild Radius
+        const dt = 0.016; // Time step
+        
+        // Scene Setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        camera.position.set(0, 10, 20);
+        controls.update();
+
+        // --- Objek Black Hole ---
+        
+        // 1. Singularity (Core)
+        const singularityGeo = new THREE.SphereGeometry(0.1, 8, 8);
+        const singularityMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const singularity = new THREE.Mesh(singularityGeo, singularityMat);
+        scene.add(singularity);
+
+        // 2. Event Horizon (r <= Rs)
+        const horizonGeo = new THREE.SphereGeometry(Rs, 32, 32);
+        const horizonMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+        const eventHorizon = new THREE.Mesh(horizonGeo, horizonMat);
+        scene.add(eventHorizon);
+
+        // 3. Accretion Disk (Cakram Akresi)
+        const diskGeo = new THREE.RingGeometry(Rs * 2, Rs * 6, 64);
+        const diskMat = new THREE.MeshBasicMaterial({ 
+            color: 0xff5500, 
+            side: THREE.DoubleSide, 
+            transparent: true, 
+            opacity: 0.6,
+            wireframe: true 
+        });
+        const disk = new THREE.Mesh(diskGeo, diskMat);
+        disk.rotation.x = Math.PI / 2;
+        scene.add(disk);
+
+        // --- Sistem Partikel ---
+        const particles = [];
+        const particleCount = 500;
+        const particleGeo = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+        const colors = new Float32Array(particleCount * 3);
+
+        for (let i = 0; i < particleCount; i++) {
+            resetParticle(i);
+        }
+
+        const particleMat = new THREE.PointsMaterial({ size: 0.05, vertexColors: true });
+        const particleSystem = new THREE.Points(particleGeo, particleMat);
+        scene.add(particleSystem);
+
+        function resetParticle(i) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 10 + Math.random() * 20;
+            const x = Math.cos(angle) * dist;
+            const y = (Math.random() - 0.5) * 2;
+            const z = Math.sin(angle) * dist;
+            
+            particles[i] = {
+                pos: new THREE.Vector3(x, y, z),
+                vel: new THREE.Vector3(-z, 0, x).normalize().multiplyScalar(2), // Tangential initial velocity
+                alive: true
+            };
+        }
+
+        // --- Loop Update ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const posArray = new Float32Array(particleCount * 3);
+            let activeCount = 0;
+
+            for (let i = 0; i < particleCount; i++) {
+                const p = particles[i];
+                const rVec = new THREE.Vector3(0, 0, 0).sub(p.pos);
+                const r = rVec.length();
+
+                // 1. Check Event Horizon Absorption
+                if (r <= Rs) {
+                    resetParticle(i);
+                }
+
+                // 2. Compute Gravity Acceleration: a = GM / r^2
+                const forceMag = (G * M) / Math.pow(r, 2);
+                const accel = rVec.normalize().multiplyScalar(forceMag);
+
+                // 3. Update Velocity & Position (Update Loop)
+                p.vel.add(accel.multiplyScalar(dt));
+                
+                // Simulasi Time Dilation sederhana (melambat saat mendekat)
+                const timeDilation = Math.sqrt(Math.max(0, 1 - Rs / r));
+                const effectiveDt = dt * timeDilation;
+                
+                p.pos.add(p.vel.clone().multiplyScalar(effectiveDt));
+
+                posArray[i * 3] = p.pos.x;
+                posArray[i * 3 + 1] = p.pos.y;
+                posArray[i * 3 + 2] = p.pos.z;
+                
+                activeCount++;
+            }
+
+            particleGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            
+            // Animasi Rotasi Disk
+            disk.rotation.z += 0.01;
+            
+            document.getElementById('p-count').innerText = activeCount;
+            
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>

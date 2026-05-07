@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Simulasi Black Hole 3D | Gravitasi & Lensing Efek</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', 'Poppins', 'Arial', sans-serif;
+        }
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px);
+            padding: 12px 20px;
+            border-radius: 12px;
+            pointer-events: none;
+            z-index: 10;
+            font-size: 14px;
+            border-left: 4px solid #ff3366;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            font-weight: 500;
+        }
+        #info h1 {
+            margin: 0 0 4px;
+            font-size: 1.2rem;
+            letter-spacing: 1px;
+        }
+        #info p {
+            margin: 0;
+            font-size: 0.75rem;
+            opacity: 0.8;
+        }
+        #stats-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: #ccc;
+            background: rgba(0,0,0,0.65);
+            backdrop-filter: blur(5px);
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-family: monospace;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 10;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+        #controls-hint {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            color: rgba(255,255,255,0.6);
+            background: rgba(0,0,0,0.5);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-family: monospace;
+            pointer-events: none;
+            z-index: 10;
+        }
+        @media (max-width: 600px) {
+            #info { font-size: 10px; top: 10px; left: 10px; padding: 8px 12px; }
+            #stats-panel { font-size: 9px; bottom: 10px; left: 10px; }
+            #controls-hint { font-size: 8px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h1>🕳️ BLACK HOLE SIMULATION | Relativistic Minimal Model</h1>
+        <p>Gravitasi Newton + Event Horizon (Rs) | Photon Sphere (1.5 Rs) | Accretion Disk | Lensing Efek</p>
+    </div>
+    <div id="stats-panel">
+        <span id="particle-count">⚫ Partikel aktif: 0</span> &nbsp;|&nbsp;
+        <span id="bh-stats">🌀 Massa BH: 2.0 ☉ | Rs: ~1.48 unit</span>
+    </div>
+    <div id="controls-hint">
+        🖱️ Drag untuk rotasi kamera | Scroll zoom
+    </div>
+
+    <!-- Import Three.js core dan add-ons via CDN -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        
+        // --- KONSTANTA FISIKA (Simulasi, skala artistik) ---
+        const G = 0.8;        // Gravitasi (skala untuk visual efek)
+        const c = 2.2;        // Kecepatan cahaya (skala)
+        const BH_MASS = 2.0;   // Massa black hole
+        // Hitung Radius Schwarzschild (Rs)
+        const Rs = (2 * G * BH_MASS) / (c * c);   // ≈ (2*0.8*2)/(4.84) = 3.2/4.84 ≈ 0.661
+        const PHOTON_SPHERE_RADIUS = 1.5 * Rs;     // ≈ 0.9915
+        const EVENT_HORIZON_RADIUS = Rs;
+        
+        // Parameter tambahan
+        const SINGULARITY_POS = new THREE.Vector3(0, 0, 0);
+        
+        // Warna & efek
+        const ACCRETION_DISK_INNER = 1.8;
+        const ACCRETION_DISK_OUTER = 4.5;
+        
+        // Setup Scene
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x010118);
+        scene.fog = new THREE.FogExp2(0x010118, 0.012); // sedikit kabut kosmik
+        
+        // Camera
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(8, 5, 12);
+        camera.lookAt(0, 0, 0);
+        
+        // Renderer
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.toneMapping = THREE.ReinhardToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        document.body.appendChild(renderer.domElement);
+        
+        // Postprocessing (Bloom untuk efek glow accretion)
+        const renderScene = new RenderPass(scene, camera);
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.2, 0.3, 0.85);
+        bloomPass.threshold = 0.1;
+        bloomPass.strength = 0.9;
+        bloomPass.radius = 0.5;
+        const effectComposer = new EffectComposer(renderer);
+        effectComposer.addPass(renderScene);
+        effectComposer.addPass(bloomPass);
+        
+        // Controls
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.zoomSpeed = 1.2;
+        controls.rotateSpeed = 1.0;
+        controls.enableZoom = true;
+        controls.autoRotate = false;
+        controls.target.set(0, 0, 0);
+        
+        // --- LIGHTING ---
+        // Ambient subtle
+        const ambientLight = new THREE.AmbientLight(0x111122);
+        scene.add(ambientLight);
+        // Point light di pusat untuk efek sorot
+        const coreLight = new THREE.PointLight(0xff3366, 1.2, 20);
+        coreLight.position.set(0, 0, 0);
+        scene.add(coreLight);
+        // Additional fill light
+        const fillLight = new THREE.DirectionalLight(0x88aaff, 0.5);
+        fillLight.position.set(2, 5, 3);
+        scene.add(fillLight);
+        
+        // --- VISUAL BLACK HOLE COMPONENTS ---
+        // 1. Event Horizon Sphere (gelap dengan efek fresnel tipis)
+        const horizonGeometry = new THREE.SphereGeometry(EVENT_HORIZON_RADIUS, 64, 64);
+        const horizonMaterial = new THREE.MeshStandardMaterial({
+            color: 0x000000,
+            emissive: 0x220000,
+            emissiveIntensity: 0.4,
+            roughness: 0.3,
+            metalness: 0.8,
+            transparent: true,
+            opacity: 0.92
+        });
+        const eventHorizon = new THREE.Mesh(horizonGeometry, horizonMaterial);
+        scene.add(eventHorizon);
+        
+        // 2. Photon Sphere (lingkaran tipis tembus cahaya)
+        const photonGeo = new THREE.SphereGeometry(PHOTON_SPHERE_RADIUS, 96, 96);
+        const photonMat = new THREE.MeshBasicMaterial({
+            color: 0xffaa44,
+            transparent: true,
+            opacity: 0.09,
+            wireframe: true
+        });
+        const photonSphere = new THREE.Mesh(photonGeo, photonMat);
+        scene.add(photonSphere);
+        
+        // 3. Accretion Disk (toroid / ring partikel + glow disk)
+        // Disk utama menggunakan torus dengan texture glow
+        const diskGeometry = new THREE.TorusGeometry(2.8, 0.22, 128, 200);
+        const diskMaterial = new THREE.MeshStandardMaterial({
+            color: 0xff6633,
+            emissive: 0xff4411,
+            emissiveIntensity: 0.8,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.7
+        });
+        const accretionDisk = new THREE.Mesh(diskGeometry, diskMaterial);
+        accretionDisk.rotation.x = Math.PI / 2.2;
+        accretionDisk.rotation.z = 0.3;
+        scene.add(accretionDisk);
+        
+        // Disk kedua bagian luar
+        const outerDiskGeo = new THREE.TorusGeometry(3.9, 0.18, 128, 200);
+        const outerDiskMat = new THREE.MeshStandardMaterial({
+            color: 0xff8855,
+            emissive: 0xff4422,
+            emissiveIntensity: 0.5,
+            transparent: true,
+            opacity: 0.6
+        });
+        const outerDisk = new THREE.Mesh(outerDiskGeo, outerDiskMat);
+        outerDisk.rotation.x = Math.PI / 2.2;
+        outerDisk.rotation.z = -0.2;
+        scene.add(outerDisk);
+        
+        // Efek partikel kecil berkilau di sekitar (glow dust)
+        const dustParticleCount = 800;
+        const dustGeometry = new THREE.BufferGeometry();
+        const dustPositions = new Float32Array(dustParticleCount * 3);
+        for (let i = 0; i < dustParticleCount; i++) {
+            // distribusi di sekitar disk
+            const r = ACCRETION_DISK_INNER + Math.random() * (ACCRETION_DISK_OUTER - ACCRETION_DISK_INNER);
+            const angle = Math.random() * Math.PI * 2;
+            const yOffset = (Math.random() - 0.5) * 0.6;
+            dustPositions[i*3] = Math.cos(angle) * r;
+            dustPositions[i*3+1] = yOffset;
+            dustPositions[i*3+2] = Math.sin(angle) * r;
+        }
+        dustGeometry.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+        const dustMaterial = new THREE.PointsMaterial({ color: 0xffaa77, size: 0.045, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending });
+        const dustPoints = new THREE.Points(dustGeometry, dustMaterial);
+        scene.add(dustPoints);
+        
+        // Singularity core glow (small bright center)
+        const singularityGlow = new THREE.Mesh(
+            new THREE.SphereGeometry(0.18, 24, 24),
+            new THREE.MeshStandardMaterial({ color: 0xff6666, emissive: 0xff2222, emissiveIntensity: 1.5 })
+        );
+        scene.add(singularityGlow);
+        
+        // Tambahan bintang latar (starfield)
+        const starGeometry = new THREE.BufferGeometry();
+        const starCount = 1800;
+        const starPositionsArr = new Float32Array(starCount * 3);
+        for (let i = 0; i < starCount; i++) {
+            starPositionsArr[i*3] = (Math.random() - 0.5) * 200;
+            starPositionsArr[i*3+1] = (Math.random() - 0.5) * 100;
+            starPositionsArr[i*3+2] = (Math.random() - 0.5) * 100 - 50;
+        }
+        starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositionsArr, 3));
+        const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.08, transparent: true, opacity: 0.7 });
+        const stars = new THREE.Points(starGeometry, starMaterial);
+        scene.add(stars);
+        
+        // --- PHYSICS & PARTICLE SYSTEM ---
+        class Particle {
+            constructor(pos, vel) {
+                this.position = pos.clone();
+                this.velocity = vel.clone();
+                this.alive = true;
+                this.age = 0;
+                this.maxAge = 20 + Math.random() * 15;
+                this.color = new THREE.Color().setHSL(0.10 + Math.random() * 0.1, 1.0, 0.6);
+            }
+        }
+        
+        let particles = [];
+        const MAX_PARTICLES = 800;
+        let spawnAccumulator = 0;
+        const SPAWN_RATE = 0.65; // partikel per frame (60fps ~ 40 partikel/dtk)
+        
+        // Helper: random velocity di sekitar disk
+        function randomOrbitVelocity(radius, posDir) {
+            // kecepatan orbit melingkar sqrt(GM/r) tapi dengan turbulensi
+            const orbitalSpeed = Math.sqrt(G * BH_MASS / Math.max(radius, 0.5));
+            // arah tangensial
+            const up = new THREE.Vector3(0, 1, 0);
+            const tangent = new THREE.Vector3().crossVectors(up, posDir).normalize();
+            // sedikit komponen radial random
+            const radialNoise = new THREE.Vector3(
+                (Math.random() - 0.5) * 0.5,
+                (Math.random() - 0.5) * 0.3,
+                (Math.random() - 0.5) * 0.5
+            ).normalize();
+            const velDir = tangent.clone().multiplyScalar(orbitalSpeed).add(radialNoise.multiplyScalar(orbitalSpeed * 0.2));
+            return velDir;
+        }
+        
+        function spawnParticle() {
+            if (particles.length >= MAX_PARTICLES) return;
+            // spawn di radius antara 2.0 sampai 6.0 (zona disk)
+            const radius = ACCRETION_DISK_INNER + Math.random() * (ACCRETION_DISK_OUTER - ACCRETION_DISK_INNER + 1.2);
+            const angle = Math.random() * Math.PI * 2;
+            const yOffset = (Math.random() - 0.5) * 0.7;
+            const pos = new THREE.Vector3(Math.cos(angle) * radius, yOffset, Math.sin(angle) * radius);
+            const dirToCenter = new THREE.Vector3().subVectors(SINGULARITY_POS, pos).normalize();
+            // kecepatan orbit + sedikit outward
+            const orbitalSpeed = Math.sqrt(G * BH_MASS / radius);
+            const upVec = new THREE.Vector3(0, 1, 0);
+            const tangentDir = new THREE.Vector3().crossVectors(upVec, dirToCenter).normalize();
+            let vel = tangentDir.clone().multiplyScalar(orbitalSpeed);
+            // tambah random swirl
+            vel.x += (Math.random() - 0.5) * 0.4;
+            vel.z += (Math.random() - 0.5) * 0.4;
+            vel.y += (Math.random() - 0.5) * 0.3;
+            particles.push(new Particle(pos, vel));
+        }
+        
+        // Fungsi percepatan gravitasi Newton (vector)
+        function computeAcceleration(pos, bhPos, mass) {
+            const rVec = new THREE.Vector3().subVectors(bhPos, pos);
+            const r = rVec.length();
+            if (r < 0.15) return new THREE.Vector3(0,0,0); // singularity region
+            const aMag = (G * mass) / (r * r);
+            return rVec.clone().normalize().multiplyScalar(aMag);
+        }
+        
+        // Time dilation sederhana (untuk efek update partikel)
+        function getTimeScale(r) {
+            if (r <= Rs) return 0.05; // sangat lambat di dalam horizon (tapi partikel akan mati)
+            if (r < PHOTON_SPHERE_RADIUS) return Math.sqrt(1 - Rs / Math.max(r, Rs * 0.98));
+            return 1.0;
+        }
+        
+        // Update gravitasi dan posisi partikel (Euler + time dilation)
+        let lastTimestamp = 0;
+        let deltaTime = 1/60;
+        
+        function updateParticles(dt) {
+            const clampedDt = Math.min(dt, 0.033);
+            for (let i = particles.length-1; i >= 0; i--) {
+                const p = particles[i];
+                if (!p.alive) {
+                    particles.splice(i,1);
+                    continue;
+                }
+                
+                const rVec = new THREE.Vector3().subVectors(SINGULARITY_POS, p.position);
+                const r = rVec.length();
+                
+                // CEK EVENT HORIZON
+                if (r <= EVENT_HORIZON_RADIUS) {
+                    p.alive = false;
+                    // Efek visual tambahan kecil (optional, bisa buat spark)
+                    continue;
+                }
+                
+                // Time dilation lokal
+                const timeScale = getTimeScale(r);
+                const localDt = clampedDt * timeScale;
+                
+                // Hitung percepatan
+                const acc = computeAcceleration(p.position, SINGULARITY_POS, BH_MASS);
+                // Update velocity dengan gravitasi
+                p.velocity.x += acc.x * localDt;
+                p.velocity.y += acc.y * localDt;
+                p.velocity.z += acc.z * localDt;
+                
+                // update posisi
+                p.position.x += p.velocity.x * localDt;
+                p.position.y += p.velocity.y * localDt;
+                p.position.z += p.velocity.z * localDt;
+                
+                // Batas umur partikel (setelah terlalu jauh atau terlalu lama)
+                p.age += localDt;
+                const distFromCenter = p.position.length();
+                if (distFromCenter > 12.0 || p.age > p.maxAge) {
+                    p.alive = false;
+                }
+                
+                // Optional: jika partikel terlalu lambat di luar, matikan
+                if (distFromCenter < 0.3 && distFromCenter > 0) p.alive = false;
+            }
+            
+            // Spawn partikel baru secara kontinyu
+            spawnAccumulator += SPAWN_RATE * clampedDt * 1.5;
+            while (spawnAccumulator >= 1.0 && particles.length < MAX_PARTICLES) {
+                spawnParticle();
+                spawnAccumulator -= 1.0;
+            }
+        }
+        
+        // --- GRAVITATIONAL LENSING EFFECT: dengan ray bending pada partikel visual (points) dan efek lensing di shader? 
+        // Untuk efek lensing yang lebih dramatis, kita buat efek warping pada background stars menggunakan vertex shader sederhana?
+        // Pendekatan: Kita akan menerapkan efek defleksi pada partikel yang berada di sekitar lensing zone dengan memodifikasi posisi visual Points?
+        // Namun untuk mempertahankan stabilitas, saya akan menambahkan efek post-processing radial blur / distortion sekitar black hole via custom shader pass?
+        // Alternatif: membuat secondary pass "glow lensing" menggunakan efek distorsi.
+        // Implementasi sederhana: Tambahkan efek sinar dan lingkaran cahaya serta gerakan partikel yang menunjukkan lengkungan.
+        // Untuk menjamin "realisme lensing", kita modifikasi arah partikel ringan di sekitar Photon Sphere.
+        // Tapi lebih menarik: Saya buat material custom untuk stars? terlalu berat.
+        // Saya tambahkan efek visual "ring of fire" dengan lensing simulation pada partikel yang mendekati 1.5Rs: mereka akan berakselerasi lateral.
+        // Karena sudah ada gravitasi, partikel secara alami dibelokkan. Untuk menonjolkan lensing, kita tambahkan "bending" pada partikel dust dan garis visual.
+        
+        // Menambahkan grid lensing effect: halo lingkaran distorsi.
+        const lensingRingGeo = new THREE.RingGeometry(PHOTON_SPHERE_RADIUS - 0.08, PHOTON_SPHERE_RADIUS + 0.25, 64);
+        const lensingMat = new THREE.MeshBasicMaterial({
+            color: 0xffaa66,
+            transparent: true,
+            opacity: 0.25,
+            side: THREE.DoubleSide,
+            blending: THREE.AdditiveBlending
+        });
+        const lensingRing = new THREE.Mesh(lensingRingGeo, lensingMat);
+        lensingRing.rotation.x = Math.PI / 2;
+        scene.add(lensingRing);
+        
+        // Ring kedua lebih luar tilted
+        const outerLensRing = new THREE.Mesh(
+            new THREE.RingGeometry(PHOTON_SPHERE_RADIUS + 0.3, PHOTON_SPHERE_RADIUS + 0.7, 64),
+            new THREE.MeshBasicMaterial({ color: 0xff8844, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending })
+        );
+        outerLensRing.rotation.x = 1.2;
+        outerLensRing.rotation.z = 0.5;
+        scene.add(outerLensRing);
+        
+        // Visual particle system (Three.js Points)
+        let particleMeshes = null;
+        const particlePositionsAttr = new Float32Array(MAX_PARTICLES * 3);
+        const particleColorsAttr = new Float32Array(MAX_PARTICLES * 3);
+        const particleGeometry = new THREE.BufferGeometry();
+        particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositionsAttr, 3));
+        particleGeometry.setAttribute('color', new THREE.BufferAttribute(particleColorsAttr, 3));
+        const particlePointMat = new THREE.PointsMaterial({ size: 0.085, vertexColors: true, blending: THREE.AdditiveBlending });
+        const particleSystem = new THREE.Points(particleGeometry, particlePointMat);
+        scene.add(particleSystem);
+        
+        // Function update visual partikel setiap frame
+        function updateVisualParticles() {
+            const positions = particleGeometry.attributes.position.array;
+            const colors = particleGeometry.attributes.color.array;
+            // reset semua ke 0, lalu isi berdasarkan partikel aktif
+            for (let i = 0; i < MAX_PARTICLES; i++) {
+                if (i < particles.length) {
+                    const p = particles[i];
+                    positions[i*3] = p.position.x;
+                    positions[i*3+1] = p.position.y;
+                    positions[i*3+2] = p.position.z;
+                    // warna berdasarkan jarak (lebih merah jika dekat)
+                    const dist = p.position.length();
+                    const t = Math.min(1, dist / 5.0);
+                    const rCol = 1.0 - t * 0.3;
+                    const gCol = 0.4 + t * 0.4;
+                    const bCol = 0.2 + t * 0.3;
+                    colors[i*3] = rCol;
+                    colors[i*3+1] = gCol;
+                    colors[i*3+2] = bCol;
+                } else {
+                    positions[i*3] = 0;
+                    positions[i*3+1] = -100;
+                    positions[i*3+2] = 0;
+                    colors[i*3] = 0;
+                    colors[i*3+1] = 0;
+                    colors[i*3+2] = 0;
+                }
+            }
+            particleGeometry.attributes.position.needsUpdate = true;
+            particleGeometry.attributes.color.needsUpdate = true;
+            document.getElementById('particle-count').innerHTML = `⚫ Partikel aktif: ${particles.length}`;
+            document.getElementById('bh-stats').innerHTML = `🌀 Massa BH: ${BH_MASS.toFixed(1)} ☉ | Rs: ${Rs.toFixed(3)} | R_ph: ${PHOTON_SPHERE_RADIUS.toFixed(3)}`;
+        }
+        
+        // Animasi rotasi accretion disk dan efek berdenyut
+        let timeAcc = 0;
+        
+        // Tambahan efek corona (glow lensing dinamis)
+        const coronaGlow = new THREE.Mesh(
+            new THREE.SphereGeometry(Rs + 0.25, 32, 32),
+            new THREE.MeshBasicMaterial({ color: 0xff4433, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending })
+        );
+        scene.add(coronaGlow);
+        
+        // Simulasi utama loop
+        let lastFrameTime = performance.now();
+        
+        function animate() {
+            const now = performance.now();
+            let dt = Math.min(0.033, (now - lastFrameTime) / 1000);
+            if (dt <= 0) dt = 0.016;
+            lastFrameTime = now;
+            
+            // Update fisika partikel
+            updateParticles(dt);
+            updateVisualParticles();
+            
+            // Animasi disk dan elemen dinamis
+            timeAcc += dt;
+            accretionDisk.rotation.z += 0.012;
+            outerDisk.rotation.z -= 0.008;
+            dustPoints.rotation.y += 0.003;
+            lensingRing.rotation.z += 0.002;
+            outerLensRing.rotation.x = 1.2 + Math.sin(timeAcc * 0.7) * 0.1;
+            // efek kedip cahaya singularitas
+            const intensity = 1.2 + Math.sin(timeAcc * 12) * 0.3;
+            singularityGlow.material.emissiveIntensity = intensity;
+            coreLight.intensity = 0.9 + Math.sin(timeAcc * 8) * 0.3;
+            
+            // Rotasi background stars
+            stars.rotation.y += 0.0005;
+            stars.rotation.x += 0.0003;
+            
+            // update controls
+            controls.update();
+            
+            // Render via EffectComposer
+            effectComposer.render();
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // Inisialisasi partikel awal (50 partikel)
+        for (let i = 0; i < 180; i++) {
+            spawnParticle();
+        }
+        
+        // Mulai simulasi
+        lastFrameTime = performance.now();
+        animate();
+        
+        // Resize handler
+        window.addEventListener('resize', onWindowResize, false);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            effectComposer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        // Console log info
+        console.log(`Black Hole Simulation Aktif | Rs = ${Rs.toFixed(4)}, Photon Sphere = ${PHOTON_SPHERE_RADIUS.toFixed(4)}`);
+        
+        // Tooltip kecil hint tambahan
+        const style = document.createElement('style');
+        style.textContent = ` .controls-hint { user-select: none; } `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>
