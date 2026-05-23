@@ -26,7 +26,7 @@ Reference platform: **Barak-8** (Israel/India joint development) — AESA MFR + 
 
 - **Phase**: 0 — Foundation (not started)
 - **Single source of truth**: [`MRSAM_SIMULATOR_PROJECT.md`](./MRSAM_SIMULATOR_PROJECT.md) — read this first. Spec, architecture, roadmap, decision log, and progress log all live in one document.
-- **Current build**: a standalone Three.js visualization (`index.html`) is checked in as an early creative exploration of the 3D engagement view. It is **not** the production codebase and will be superseded by the TypeScript core described in the spec.
+- **Current build**: a self-contained prototype (`dashboard-integrated.html`) is checked in — a Three.js engagement view wired to a live operator dashboard (tracks table, PPI radar scope, batteries, engagement stats). It is an early creative exploration, **not** the production codebase, and will be superseded by the TypeScript core described in the spec. Earlier explorations (`index.html`, `js/`, `styles.css`, `dashboard/`) are kept under [`archive/`](./archive/).
 
 The roadmap is intentionally phased and gated. Each phase requires tests passing before moving on. See [§12 Roadmap](./MRSAM_SIMULATOR_PROJECT.md#12-roadmap) for the full task list.
 
@@ -56,12 +56,16 @@ pnpm check
 pnpm build
 ```
 
-To preview the legacy Three.js exploration (the 3D scene currently in `index.html`):
+To run the current prototype (`dashboard-integrated.html`):
 
 ```bash
 python3 -m http.server 8765
-# open http://localhost:8765/index.html
+# open http://localhost:8765/dashboard-integrated.html
 ```
+
+Click the canvas once to enable audio. Controls: **Space** launch · **T** spawn target · **drag** orbit · **LAUNCH / RESET** buttons in the status bar.
+
+The archived explorations are still viewable, e.g. `http://localhost:8765/archive/index.html`.
 
 ---
 

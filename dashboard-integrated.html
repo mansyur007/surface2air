@@ -546,8 +546,15 @@
     </div>
   </footer>
 
-  <!-- LIBRARIES (React tidak dipakai — UI dirender via DOM vanilla) -->
-  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <!-- Three.js via ESM + importmap (build/three.min.js UMD sudah deprecated di r160) -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
 
   <!-- DASHBOARD UI — didorong oleh data live dari simulasi 3D (lihat script module) -->
   <script>
@@ -858,8 +865,8 @@
 
   <!-- THREE.JS SCENE (minimal setup) -->
   <script type="module">
-    import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
-    // THREE disediakan global lewat three.min.js (UMD).
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
     // ═══════════════════════════════════════════════════════════════
     // Parameter simulasi (dulu slider di prototipe lama, kini konstan)
