@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Editor / OS cruft
+*.swp
+.idea/
+.vscode/
+
+# Node (for the planned Vite/TS toolchain)
+node_modules/
+dist/
+*.log
