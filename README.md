@@ -32,6 +32,16 @@ The roadmap is intentionally phased and gated. Each phase requires tests passing
 
 ---
 
+## Live preview
+
+Open the current prototype straight from `main`, no clone required:
+
+**→ [raw.githack.com/mansyur007/surface2air/main/dashboard-integrated.html](https://raw.githack.com/mansyur007/surface2air/main/dashboard-integrated.html)**
+
+raw.githack proxies the file from GitHub with the correct `text/html` content-type, so the ES-module import map and Three.js CDN work as-is. Needs an internet connection (Three.js is loaded from unpkg). Click the canvas once to enable audio. Controls: **Space** launch · **T** spawn target · **drag** orbit · per-battery **ENGAGE** · footer **LAUNCH / RESET**.
+
+---
+
 ## Quick start
 
 > Phase 0 is not yet implemented. Once `package.json` lands, the workflow will be:
