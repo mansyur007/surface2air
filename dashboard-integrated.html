@@ -184,6 +184,7 @@
     .foot-btn.reset { border: 1px solid var(--primary); color: var(--primary); }
     .foot-btn.launch { border: 1px solid var(--red); color: var(--red); background: color-mix(in oklch, var(--red) 10%, transparent); }
     .foot-btn.map { border: 1px solid var(--amber); color: var(--amber); background: color-mix(in oklch, var(--amber) 10%, transparent); }
+    .foot-btn.site { border: 1px solid var(--blue); color: var(--blue); background: color-mix(in oklch, var(--blue) 12%, transparent); }
 
     /* ── Modal ───────────────────────────────────────── */
     .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 2000;
@@ -199,6 +200,22 @@
     .modal-row .v { text-align: right; color: var(--text); font-weight: 600; }
     .modal-note { padding: 0 14px 6px; color: var(--muted); font-size: 10px; }
     .modal-foot { padding: 10px 14px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; background: var(--bg-deep); }
+    .modal.wide { width: 760px; }
+    .sitemap-wrap { padding: 12px 14px 4px; }
+    #javaMap { display: block; width: 100%; height: auto; }
+    .site-dot { cursor: pointer; }
+    .site-dot .ring { fill: none; stroke: var(--primary); stroke-width: 1.5; opacity: 0.85; }
+    .site-dot .core { fill: var(--primary); }
+    .site-dot .hit { fill: transparent; }
+    .site-dot .lbl { fill: var(--text); font-family: "JetBrains Mono", monospace; font-size: 12px; letter-spacing: 0.06em; pointer-events: none; }
+    .site-dot.active .core { fill: var(--amber); }
+    .site-dot.active .ring { stroke: var(--amber); }
+    .site-dot.sel .pick { fill: none; stroke: var(--blue); stroke-width: 1.5; stroke-dasharray: 3 3; }
+    .site-info { padding: 6px 14px 4px; font-family: "JetBrains Mono", monospace; font-size: 11px; min-height: 38px;
+      display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+    .site-info .k { color: var(--muted); font-size: 9px; letter-spacing: 0.12em; margin-right: 6px; }
+    .site-info .v { color: var(--text); font-weight: 600; }
+    .site-info .badge { color: var(--blue); }
 
     .muted { color: var(--muted); }
     ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -219,7 +236,7 @@
       </div>
       <div>
         <div class="brand-title">MRSAM C2</div>
-        <div class="brand-sub">SECTOR-7 · BMC</div>
+        <div class="brand-sub" id="brandSub">IADS WEST · JAKARTA</div>
       </div>
     </div>
 
@@ -310,6 +327,7 @@
       <span class="sep">|</span><span class="muted">CELL</span><span>NORTH-04</span>
     </div>
     <div class="foot-cluster">
+      <button id="btn-site" class="foot-btn site">⊕ SITE MAP</button>
       <button id="btn-map" class="foot-btn map">⚙ MAP SIZE</button>
       <button id="btn-reset" class="foot-btn reset">↺ RESET VIEW</button>
       <button id="btn-launch" class="foot-btn launch">⚡ LAUNCH</button>
@@ -330,6 +348,32 @@
       <div class="modal-foot">
         <button class="foot-btn reset" id="cfgCancel">CANCEL</button>
         <button class="foot-btn launch" id="cfgApply">APPLY</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SITE MAP MODAL — pilih situs baterai di Pulau Jawa -->
+  <div class="modal-backdrop" id="siteModal" aria-hidden="true">
+    <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="siteModalTitle">
+      <div class="panel-head"><span class="panel-title" id="siteModalTitle">SITE MAP — JAVA IADS</span><span class="panel-meta">SELECT FIRE SITE</span></div>
+      <div class="sitemap-wrap">
+        <svg id="javaMap" viewBox="0 0 1000 340" width="100%" preserveAspectRatio="xMidYMid meet">
+          <!-- laut -->
+          <rect x="0" y="0" width="1000" height="340" fill="var(--scope-outer)"/>
+          <!-- Pulau Jawa (skematik) -->
+          <path d="M 60 150 L 110 120 L 180 108 L 255 100 L 340 97 L 430 96 L 520 99 L 600 104 L 690 110 L 770 113 L 840 116 L 905 128 L 955 158 L 915 198 L 855 222 L 800 236 L 730 248 L 660 255 L 610 250 L 560 244 L 480 249 L 400 250 L 320 241 L 250 230 L 180 220 L 115 202 L 60 168 Z"
+                fill="color-mix(in oklch, var(--primary) 12%, var(--bg-deep))" stroke="var(--primary)" stroke-width="1.5" />
+          <!-- Madura (flavor) -->
+          <ellipse cx="888" cy="86" rx="46" ry="13" fill="color-mix(in oklch, var(--primary) 10%, var(--bg-deep))" stroke="var(--primary)" stroke-width="1" opacity="0.8"/>
+          <text x="14" y="28" fill="var(--grid-text)" font-size="13" font-family="JetBrains Mono, monospace" letter-spacing="3">JAVA SEA</text>
+          <text x="14" y="320" fill="var(--grid-text)" font-size="13" font-family="JetBrains Mono, monospace" letter-spacing="3">INDIAN OCEAN</text>
+          <g id="siteLayer"></g>
+        </svg>
+      </div>
+      <div class="site-info" id="siteInfo"><span class="muted">Pilih sebuah situs pada peta.</span></div>
+      <div class="modal-foot">
+        <button class="foot-btn reset" id="siteCancel">CANCEL</button>
+        <button class="foot-btn launch" id="siteActivate" disabled>ACTIVATE SITE</button>
       </div>
     </div>
   </div>
@@ -609,7 +653,67 @@
       modal.addEventListener('click', (e) => { if (e.target.id === 'mapModal') closeMap(); });
       window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && modal.classList.contains('open')) closeMap(); });
 
+      // ── Site map (Java IADS) ──────────────────────────
+      // axis = bearing (deg, 0=N) DARI MANA threat datang; pesisir utara → 0, selatan → 180.
+      const SITES = [
+        { id: 'JAKARTA',    name: 'JAKARTA',    sector: 'IADS WEST',    kind: 'Capital ADA',  x: 255, y: 104, axis: 0,   spread: 35, threats: 4 },
+        { id: 'BANDUNG',    name: 'BANDUNG',    sector: 'IADS WEST',    kind: 'Highland SAM', x: 300, y: 182, axis: 170, spread: 45, threats: 2 },
+        { id: 'SEMARANG',   name: 'SEMARANG',   sector: 'IADS CENTRAL', kind: 'Coastal SAM',  x: 565, y: 112, axis: 5,   spread: 35, threats: 3 },
+        { id: 'YOGYAKARTA', name: 'YOGYAKARTA', sector: 'IADS CENTRAL', kind: 'Southern SAM', x: 612, y: 214, axis: 185, spread: 40, threats: 2 },
+        { id: 'SURABAYA',   name: 'SURABAYA',   sector: 'IADS EAST',    kind: 'Naval ADA',    x: 842, y: 122, axis: 25,  spread: 40, threats: 4 },
+      ];
+      const compass = b => ['N','NE','E','SE','S','SW','W','NW'][Math.round(((b % 360) / 45)) % 8];
+      const SVGNS = 'http://www.w3.org/2000/svg';
+      const siteModal = document.getElementById('siteModal');
+      const siteLayer = document.getElementById('siteLayer');
+      const siteInfo = document.getElementById('siteInfo');
+      const siteActivateBtn = document.getElementById('siteActivate');
+      let activeSiteId = 'JAKARTA';   // default (cocok dgn sumbu ancaman awal sim = utara)
+      let pendingSite = null;
+
+      function renderSiteMarkers() {
+        siteLayer.innerHTML = '';
+        SITES.forEach(s => {
+          const g = document.createElementNS(SVGNS, 'g');
+          g.setAttribute('class', `site-dot${s.id === activeSiteId ? ' active' : ''}${pendingSite && pendingSite.id === s.id ? ' sel' : ''}`);
+          g.setAttribute('transform', `translate(${s.x} ${s.y})`);
+          g.innerHTML = `
+            <circle class="pick" r="13" />
+            <circle class="ring" r="8" />
+            <circle class="core" r="3.5" />
+            <circle class="hit" r="18" />
+            <text class="lbl" x="13" y="4">${s.name}</text>`;
+          g.addEventListener('click', () => { pendingSite = s; renderSiteMarkers(); renderSiteInfo(); siteActivateBtn.disabled = false; });
+          siteLayer.appendChild(g);
+        });
+      }
+      function renderSiteInfo() {
+        const s = pendingSite || SITES.find(x => x.id === activeSiteId);
+        if (!s) { siteInfo.innerHTML = '<span class="muted">Pilih sebuah situs pada peta.</span>'; return; }
+        const tag = s.id === activeSiteId && (!pendingSite || pendingSite.id === activeSiteId) ? ' <span class="badge">[ACTIVE]</span>' : '';
+        siteInfo.innerHTML = `
+          <span><span class="k">SITE</span><span class="v">${s.name}</span>${tag}</span>
+          <span><span class="k">SECTOR</span><span class="v">${s.sector}</span></span>
+          <span><span class="k">TYPE</span><span class="v">${s.kind}</span></span>
+          <span><span class="k">THREAT AXIS</span><span class="v">${String(Math.round(s.axis)).padStart(3,'0')}° ${compass(s.axis)}</span></span>
+          <span><span class="k">EXPECTED</span><span class="v">${s.threats} inbound</span></span>`;
+      }
+      function openSite() { pendingSite = null; siteActivateBtn.disabled = true; renderSiteMarkers(); renderSiteInfo(); siteModal.classList.add('open'); }
+      function closeSite() { siteModal.classList.remove('open'); }
+      document.getElementById('btn-site').addEventListener('click', openSite);
+      document.getElementById('siteCancel').addEventListener('click', closeSite);
+      siteActivateBtn.addEventListener('click', () => {
+        if (!pendingSite) return;
+        activeSiteId = pendingSite.id;
+        document.getElementById('brandSub').textContent = `${pendingSite.sector} · ${pendingSite.name}`;
+        if (window.__sim && window.__sim.setSite) window.__sim.setSite(pendingSite);
+        closeSite();
+      });
+      siteModal.addEventListener('click', (e) => { if (e.target.id === 'siteModal') closeSite(); });
+      window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && siteModal.classList.contains('open')) closeSite(); });
+
       window.__log('INFO', 'Console online — datalink nominal');
+      window.__log('INFO', 'Active site: JAKARTA — IADS WEST');
     });
   </script>
 
@@ -992,10 +1096,23 @@
       group.userData.prop = propGroup; group.userData.blink = blinkMat; return group;
     }
     function createTarget() { const group = buildShahedMesh(); group.visible = false; scene.add(group); return { group, alive: false, id: '', t: 0, phase: 0, pos: new THREE.Vector3(), vel: new THREE.Vector3(), cruiseDir: new THREE.Vector3() }; }
+    // Sumbu ancaman: bearing (deg, 0=N) dari mana threat datang. Diset oleh situs aktif.
+    let threatAxis = 0, threatSpread = 40;
     function spawnTarget(t) {
-      const W = roomDim.w, H = roomDim.h, D = roomDim.d, fromLeft = Math.random() < 0.5, sx = fromLeft ? -(W / 2 + 5) : (W / 2 + 5);
-      t.pos.set(sx, H * 0.35 + Math.random() * (H * 0.25), (Math.random() - 0.5) * D * 0.7);
-      t.cruiseDir.set(fromLeft ? 1 : -1, -0.05 + Math.random() * 0.1, (Math.random() - 0.5) * 0.4).normalize();
+      const W = roomDim.w, H = roomDim.h, D = roomDim.d;
+      // Bearing kedatangan ± sebaran, lalu posisi spawn di tepi peta searah bearing itu.
+      const B = (threatAxis + (Math.random() * 2 - 1) * threatSpread) * Math.PI / 180;
+      const dir = new THREE.Vector3(Math.sin(B), 0, -Math.cos(B)); // center → tepi (outbound)
+      const ax = Math.abs(dir.x), az = Math.abs(dir.z);
+      const R = Math.min(ax > 1e-4 ? (W / 2 + 6) / ax : Infinity, az > 1e-4 ? (D / 2 + 6) / az : Infinity);
+      t.pos.copy(dir).multiplyScalar(R);
+      t.pos.y = H * 0.35 + Math.random() * (H * 0.25);
+      // Arah jelajah: menuju pusat (inbound) + sedikit wobble lateral/vertikal.
+      t.cruiseDir.copy(dir).multiplyScalar(-1);
+      t.cruiseDir.x += (Math.random() - 0.5) * 0.3;
+      t.cruiseDir.z += (Math.random() - 0.5) * 0.3;
+      t.cruiseDir.y = -0.05 + Math.random() * 0.1;
+      t.cruiseDir.normalize();
       t.alive = true; t.t = 0; t.phase = Math.random() * 6.28; t.id = 'T-' + String(++trackSeq).padStart(3, '0');
       t.vel.copy(t.cruiseDir).multiplyScalar(TARGET_SPEED); t.group.position.copy(t.pos); t.group.lookAt(t.pos.clone().add(t.vel)); t.group.visible = true;
       logEvt('INFO', `RADAR ACQ ${t.id} brg ${fmt3(bearingOf(t.pos))} — SHAHED`);
@@ -1118,6 +1235,18 @@
     }
 
     // ── Kontrol publik + keyboard ─────────────────────
+    // Aktifkan situs baterai: re-seed skenario sesuai sumbu ancaman lokasi.
+    function setSite(site) {
+      threatAxis = site.axis; threatSpread = site.spread;
+      for (const t of targets) { t.alive = false; t.group.visible = false; }
+      for (const m of missiles) { m.alive = false; m.group.visible = false; m.trail.count = 0; m.trail.geom.setDrawRange(0, 0); }
+      hits = 0; misses = 0;
+      for (const b of batteries) { b.rdy = b.total; b.reloading = false; b.lastFire = -99; }
+      const n = site.threats || 3;
+      for (let i = 0; i < n; i++) setTimeout(spawnNewTarget, 200 + i * 600);
+      setStatus('READY');
+      logEvt('INFO', `SITE ACTIVE — ${site.name} (${site.sector})`);
+    }
     window.__sim = {
       launch: () => launchMissile(),
       engage: (id) => launchMissile(id),
@@ -1125,6 +1254,7 @@
       reset: () => { camera.position.copy(initialCamPos); controls.target.set(0, Math.min(roomDim.h, 30), 0); controls.update(); },
       resize: (w, h, d) => applyRoomConfig(w, h, d),
       getRoom: () => ({ w: roomDim.w, h: roomDim.h, d: roomDim.d }),
+      setSite: (site) => setSite(site),
     };
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Space') { e.preventDefault(); launchMissile(); }
