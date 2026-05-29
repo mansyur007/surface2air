@@ -183,6 +183,22 @@
     .foot-btn { font-family: "JetBrains Mono", monospace; font-size: 10px; letter-spacing: 0.12em; padding: 3px 10px; cursor: pointer; background: transparent; }
     .foot-btn.reset { border: 1px solid var(--primary); color: var(--primary); }
     .foot-btn.launch { border: 1px solid var(--red); color: var(--red); background: color-mix(in oklch, var(--red) 10%, transparent); }
+    .foot-btn.map { border: 1px solid var(--amber); color: var(--amber); background: color-mix(in oklch, var(--amber) 10%, transparent); }
+
+    /* ── Modal ───────────────────────────────────────── */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 2000;
+      display: none; align-items: center; justify-content: center; }
+    .modal-backdrop.open { display: flex; }
+    .modal { background: var(--panel); border: 1px solid var(--border); width: 380px; max-width: 92vw;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.6); }
+    .modal-body { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+    .modal-row { display: grid; grid-template-columns: 64px 1fr 72px; gap: 10px; align-items: center;
+      font-family: "JetBrains Mono", monospace; font-size: 11px; }
+    .modal-row label { color: var(--muted); letter-spacing: 0.12em; font-size: 9px; }
+    .modal-row input[type=range] { width: 100%; accent-color: var(--primary); }
+    .modal-row .v { text-align: right; color: var(--text); font-weight: 600; }
+    .modal-note { padding: 0 14px 6px; color: var(--muted); font-size: 10px; }
+    .modal-foot { padding: 10px 14px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; background: var(--bg-deep); }
 
     .muted { color: var(--muted); }
     ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -294,10 +310,29 @@
       <span class="sep">|</span><span class="muted">CELL</span><span>NORTH-04</span>
     </div>
     <div class="foot-cluster">
+      <button id="btn-map" class="foot-btn map">⚙ MAP SIZE</button>
       <button id="btn-reset" class="foot-btn reset">↺ RESET VIEW</button>
       <button id="btn-launch" class="foot-btn launch">⚡ LAUNCH</button>
     </div>
   </footer>
+
+  <!-- MAP SIZE MODAL -->
+  <div class="modal-backdrop" id="mapModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mapModalTitle">
+      <div class="panel-head"><span class="panel-title" id="mapModalTitle">MAP SIZE</span><span class="panel-meta">DEFENDED AREA</span></div>
+      <div class="modal-body">
+        <div class="modal-row"><label>WIDTH X</label><input id="cfgX" type="range" min="80" max="800" step="20" value="800"><span class="v"><span id="cfgXv">800</span> m</span></div>
+        <div class="modal-row"><label>HEIGHT Y</label><input id="cfgY" type="range" min="20" max="150" step="5" value="150"><span class="v"><span id="cfgYv">150</span> m</span></div>
+        <div class="modal-row"><label>LENGTH Z</label><input id="cfgZ" type="range" min="80" max="800" step="20" value="800"><span class="v"><span id="cfgZv">800</span> m</span></div>
+        <div class="modal-row" style="grid-template-columns:64px 1fr"><label>AREA</label><span class="v" id="cfgArea">640,000 m²</span></div>
+      </div>
+      <div class="modal-note">Akan rebuild jalan/gedung/pohon. Ukuran besar bisa lambat sesaat.</div>
+      <div class="modal-foot">
+        <button class="foot-btn reset" id="cfgCancel">CANCEL</button>
+        <button class="foot-btn launch" id="cfgApply">APPLY</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Three.js via ESM + importmap (build/three.min.js UMD sudah deprecated di r160) -->
   <script type="importmap">
@@ -540,6 +575,40 @@
       setInterval(() => { if (appState.tracks.length === 0) renderRadar(); }, 100);
       document.getElementById('btn-reset').addEventListener('click', () => { if (window.__sim) window.__sim.reset(); });
       document.getElementById('btn-launch').addEventListener('click', () => { if (window.__sim) window.__sim.launch(); });
+
+      // Map-size modal
+      const modal = document.getElementById('mapModal');
+      const cfgX = document.getElementById('cfgX'), cfgY = document.getElementById('cfgY'), cfgZ = document.getElementById('cfgZ');
+      function updateCfgArea() {
+        document.getElementById('cfgXv').textContent = cfgX.value;
+        document.getElementById('cfgYv').textContent = cfgY.value;
+        document.getElementById('cfgZv').textContent = cfgZ.value;
+        document.getElementById('cfgArea').textContent = (+cfgX.value * +cfgZ.value).toLocaleString('en-US') + ' m²';
+      }
+      [cfgX, cfgY, cfgZ].forEach(s => s.addEventListener('input', updateCfgArea));
+      function openMap() {
+        // Sinkron slider dengan ukuran saat ini di sim
+        if (window.__sim && window.__sim.getRoom) {
+          const r = window.__sim.getRoom();
+          cfgX.value = r.w; cfgY.value = r.h; cfgZ.value = r.d;
+        }
+        updateCfgArea();
+        modal.classList.add('open');
+      }
+      function closeMap() { modal.classList.remove('open'); }
+      document.getElementById('btn-map').addEventListener('click', openMap);
+      document.getElementById('cfgCancel').addEventListener('click', closeMap);
+      document.getElementById('cfgApply').addEventListener('click', () => {
+        const w = +cfgX.value, h = +cfgY.value, d = +cfgZ.value;
+        if (window.__sim && window.__sim.resize) {
+          window.__sim.resize(w, h, d);
+          window.__log && window.__log('INFO', `Map resized → ${w}×${h}×${d} m`);
+        }
+        closeMap();
+      });
+      modal.addEventListener('click', (e) => { if (e.target.id === 'mapModal') closeMap(); });
+      window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && modal.classList.contains('open')) closeMap(); });
+
       window.__log('INFO', 'Console online — datalink nominal');
     });
   </script>
@@ -553,7 +622,7 @@
     const TARGET_SPEED = 25, MISSILE_SPEED = 60, MANEUVER = 4, PROX = 0.5;
     const AUTO_SPAWN = true;
     let SOUND_ON = true;
-    const roomDim = { w: 200, h: 50, d: 200 };
+    const roomDim = { w: 800, h: 150, d: 800 };
     // Fire units — state nyata: amunisi berkurang saat menembak, reload otomatis
     let simTime = 0;
     const RELOAD_SEC = 12;
@@ -1049,18 +1118,38 @@
     }
 
     // ── Kontrol publik + keyboard ─────────────────────
-    window.__sim = { launch: () => launchMissile(), engage: (id) => launchMissile(id), spawn: spawnNewTarget, reset: () => { camera.position.copy(initialCamPos); controls.target.set(0, 8, 0); controls.update(); } };
+    window.__sim = {
+      launch: () => launchMissile(),
+      engage: (id) => launchMissile(id),
+      spawn: spawnNewTarget,
+      reset: () => { camera.position.copy(initialCamPos); controls.target.set(0, Math.min(roomDim.h, 30), 0); controls.update(); },
+      resize: (w, h, d) => applyRoomConfig(w, h, d),
+      getRoom: () => ({ w: roomDim.w, h: roomDim.h, d: roomDim.d }),
+    };
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Space') { e.preventDefault(); launchMissile(); }
       else if (e.code === 'KeyT') { e.preventDefault(); ensureAudio(); spawnNewTarget(); }
     });
     canvas.addEventListener('click', ensureAudio, { once: true });
 
+    // ── Rebuild defended area + environment + adjust camera/shadow ─
+    function applyRoomConfig(W, H, D) {
+      roomDim.w = W; roomDim.h = H; roomDim.d = D;
+      buildRoom(W, H, D);
+      radarGroup.position.set(5, 0, 2);
+      const half = Math.max(W, D) * 0.55, sc = sun.shadow.camera;
+      sc.left = -half; sc.right = half; sc.top = half; sc.bottom = -half; sc.updateProjectionMatrix();
+      controls.maxDistance = Math.max(W, D) * 3 + 200;
+      const span = Math.max(W, D);
+      initialCamPos.set(span * 0.9, Math.max(150, span * 0.4), span);
+      camera.position.copy(initialCamPos);
+      controls.target.set(0, Math.min(H, 30), 0);
+      controls.update();
+      rebuildEnvironmentInside(W, H, D);
+    }
+
     // ── Init ──────────────────────────────────────────
-    buildRoom(roomDim.w, roomDim.h, roomDim.d);
-    radarGroup.position.set(5, 0, 2);
-    { const half = Math.max(roomDim.w, roomDim.d) * 0.55, sc = sun.shadow.camera; sc.left = -half; sc.right = half; sc.top = half; sc.bottom = -half; sc.updateProjectionMatrix(); controls.maxDistance = Math.max(roomDim.w, roomDim.d) * 3 + 200; }
-    rebuildEnvironmentInside(roomDim.w, roomDim.h, roomDim.d);
+    applyRoomConfig(roomDim.w, roomDim.h, roomDim.d);
     spawnNewTarget();
 
     // ── Loop ──────────────────────────────────────────
